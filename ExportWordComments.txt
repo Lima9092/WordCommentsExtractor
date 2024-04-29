@@ -1,0 +1,126 @@
+' ======================================================================================
+' Macro Name: ExportWordCommentsAndRepliesToExcelUKDateFormat
+' Author: Lee Jolley / lee@jolley.me
+' Date: 19/03/2024
+' Description:
+' This macro extracts top-level comments from a Word document, aggregates any replies to
+' those comments, and exports the data to an Excel spreadsheet. It includes details such
+' as ID, Date (in DD/MM/YYYY format), Page, Selected Text, Author, 
+' Reviewer Comment, Replies/Responses, and the Status of each comment.
+'
+' Instructions for Use:
+' 1. Open the Word document from which you wish to extract comments. If your document is 
+'    currently in a macro-free format (e.g., .docx), you will need to save it in a 
+'    macro-enabled format (.docm) to proceed. Click 'File' -> 'Save As', choose 'Word 
+'    Macro-Enabled Document (*.docm)' from the 'Save as type' dropdown, and then click 'Save'.
+'    Ensure you Check Out and Enable Editing as required. Close and re-open if required.
+' 2. Press Alt + F11 to open the VBA Editor.
+' 3. In the Project Explorer, find the document you're working with, then right-click
+'    and choose 'Insert' -> 'Module' to create a new module.
+' 4. Copy and paste this macro into the newly created module.
+' 5. Close the VBA Editor and return to your Word document.
+' 6. Press Alt + F8, select 'ExportWordCommentsAndRepliesToExcelUKDateFormat' from the list,
+'    and then click 'Run'.
+' 7. Excel will open with a new workbook containing the extracted comments and their details.
+'    Ensure Excel is installed on your system.
+' 8. Once a comment is resolved use the string "Resolved" as a final comment in order for the
+'    script to mark the comment as closed.
+' 9. Save the Excel file as desired.
+'
+' Use Rights Policy:
+' This macro is provided under an open use policy by Lee Jolley. You are free to use, modify, 
+' and distribute this macro in your own projects, whether personal, commercial, or 
+' educational, under the following conditions:
+' 1. This policy text and credit to the original author (Lee Jolley) must be retained in any 
+'    versions or derivatives of the macro.
+' 2. Any improvements or modifications to this macro should ideally be shared back 
+'    with the community or made publicly available, although this is encouraged but not mandatory.
+' 3. This macro is provided "as is," without warranty of any kind, express or implied. 
+'    In no event shall the author be liable for any claim, damages, or other liability 
+'    arising from its use.
+'
+' ======================================================================================
+
+Sub ExportWordCommentsAndRepliesToExcelUKDateFormat()
+    Dim xlApp As Object, xlBook As Object, xlSheet As Object
+    Dim Comment As Comment, cmtReply As Comment
+    Dim SequentialID As Long
+    Dim i As Long
+    Dim RepliesText As String, StatusText As String
+
+    ' Initialize Excel application, workbook, and worksheet
+    Set xlApp = CreateObject("Excel.Application")
+    Set xlBook = xlApp.Workbooks.Add
+    Set xlSheet = xlBook.Sheets(1)
+    xlApp.Visible = True
+
+    ' Set up headers in the Excel sheet
+    With xlSheet
+        .Cells(1, 1).Value = "ID"
+        .Cells(1, 2).Value = "Date"
+        .Cells(1, 3).Value = "Page"
+        .Cells(1, 4).Value = "Selected Text"
+        .Cells(1, 5).Value = "Author"
+        .Cells(1, 6).Value = "Reviewer Comment"
+        .Cells(1, 7).Value = "Replies/Responses"
+        .Cells(1, 8).Value = "Status"
+
+        .Range("A1:H1").Font.Bold = True
+        .Range("A1:H1").Interior.Color = RGB(54, 96, 146)
+        .Range("A1:H1").Font.Color = RGB(255, 255, 255)
+    End With
+
+    i = 2
+    SequentialID = 1
+
+    ' Iterate through each comment in the Word document
+    For Each Comment In ActiveDocument.Comments
+        If Comment.Ancestor Is Nothing Then ' Check for top-level comment
+            RepliesText = ""
+            StatusText = IIf(InStr(Comment.Range.Text, "[Resolved]") > 0, "Closed", "Open")
+
+            ' Aggregate replies for this top-level comment, including author and date
+            For Each cmtReply In ActiveDocument.Comments
+                If Not cmtReply.Ancestor Is Nothing Then
+                    If cmtReply.Ancestor.Index = Comment.Index Then
+                        RepliesText = RepliesText & cmtReply.Author & " (" & Format(cmtReply.Date, "DD/MM/YY") & "): " & cmtReply.Range.Text & Chr(10)
+                    End If
+                End If
+            Next cmtReply
+
+            ' Write the top-level comment and its replies to the Excel sheet
+            With xlSheet
+                .Cells(i, 1).Value = SequentialID
+                .Cells(i, 2).Value = Format(Comment.Date, "DD/MM/YYYY")
+                .Cells(i, 3).Value = Comment.Scope.Information(wdActiveEndPageNumber)
+                .Cells(i, 4).Value = Comment.Scope.Text
+                .Cells(i, 5).Value = Comment.Author
+                .Cells(i, 6).Value = Comment.Range.Text
+                .Cells(i, 7).Value = RepliesText
+                .Cells(i, 8).Value = StatusText
+            End With
+
+            SequentialID = SequentialID + 1
+            i = i + 1
+        End If
+    Next Comment
+
+    ' Adjustments for Excel sheet readability including text wrapping and cell alignment
+    With xlSheet
+        .Columns("D:D").WrapText = True
+        .Columns("F:F").WrapText = True
+        .Columns("G:G").WrapText = True
+        .Columns("D:D").ColumnWidth = 60
+        .Columns("F:F").ColumnWidth = 60
+        .Columns("G:G").ColumnWidth = 60
+        .Columns("H:H").ColumnWidth = 10
+        .Columns("A:C").AutoFit
+        .Columns("E:E").AutoFit
+        .Rows.AutoFit
+        .Cells.HorizontalAlignment = xlLeft
+        .Cells.VerticalAlignment = xlTop
+    End With
+
+    MsgBox "Successfully processed " & (SequentialID - 1) & " top-level comments.", vbInformation, "Export Complete"
+End Sub
+
